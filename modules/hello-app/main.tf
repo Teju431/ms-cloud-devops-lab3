@@ -1,16 +1,6 @@
 
-terraform {
-  required_providers {
-    kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = "~> 3.4"
-    }
-  }
-}
-
-provider "kubernetes" {
-  config_path    = "~/.kube/config"
-  config_context = "docker-desktop"
+variable "namespace" {
+  type = string
 }
 
 variable "image_tag" {
@@ -24,13 +14,25 @@ variable "replicas" {
 }
 
 variable "port" {
-  type    = number
-  default = 8080
+  type = number
 }
 
+# Create Kubernetes Namespace
+resource "kubernetes_namespace_v1" "env" {
+  metadata {
+    name = var.namespace
+  }
+}
+
+# Create Deployment
 resource "kubernetes_deployment_v1" "hello" {
   metadata {
-    name = "hello-app"
+    name      = "hello-app"
+    namespace = kubernetes_namespace_v1.env.metadata[0].name
+
+    labels = {
+      app = "hello-app"
+    }
   }
 
   spec {
@@ -63,9 +65,11 @@ resource "kubernetes_deployment_v1" "hello" {
   }
 }
 
+# Create LoadBalancer Service
 resource "kubernetes_service_v1" "hello" {
   metadata {
-    name = "hello-app"
+    name      = "hello-app"
+    namespace = kubernetes_namespace_v1.env.metadata[0].name
   }
 
   spec {
@@ -82,6 +86,11 @@ resource "kubernetes_service_v1" "hello" {
   }
 }
 
+# Outputs
 output "url" {
   value = "http://localhost:${var.port}"
+}
+
+output "namespace" {
+  value = kubernetes_namespace_v1.env.metadata[0].name
 }
